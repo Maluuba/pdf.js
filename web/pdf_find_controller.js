@@ -393,8 +393,9 @@ class PDFFindController {
       this._pageMatchesLength[pageIndex]);
   }
 
-  _calculateMatch(pageIndex) {
-    let pageContent = this._pageContents[pageIndex];
+  _calculateMatch(curIndex, nextIndex) {
+    let pageContent = this._pageContents[curIndex] +
+        this._pageContents[nextIndex];
     let query = this._query;
     const { caseSensitive, entireWord, phraseSearch, } = this._state;
 
@@ -409,23 +410,24 @@ class PDFFindController {
     }
 
     if (phraseSearch) {
-      this._calculatePhraseMatch(query, pageIndex, pageContent, entireWord);
+      this._calculatePhraseMatch(query, curIndex, pageContent, entireWord);
     } else {
-      this._calculateWordMatch(query, pageIndex, pageContent, entireWord);
+      this._calculateWordMatch(query, curIndex, pageContent, entireWord);
     }
 
     // When `highlightAll` is set, ensure that the matches on previously
     // rendered (and still active) pages are correctly highlighted.
     if (this._state.highlightAll) {
-      this._updatePage(pageIndex);
+      this._updatePage(curIndex);
+      this._updatePage(nextIndex);
     }
-    if (this._resumePageIdx === pageIndex) {
+    if (this._resumePageIdx === curIndex) {
       this._resumePageIdx = null;
       this._nextPageMatch();
     }
 
     // Update the match count.
-    const pageMatchesCount = this._pageMatches[pageIndex].length;
+    const pageMatchesCount = this._pageMatches[curIndex].length;
     if (pageMatchesCount > 0) {
       this._matchesCountTotal += pageMatchesCount;
       this._updateUIResultsCount();
@@ -517,9 +519,20 @@ class PDFFindController {
           continue;
         }
         this._pendingFindMatches[i] = true;
-        this._extractTextPromises[i].then((pageIdx) => {
-          delete this._pendingFindMatches[pageIdx];
-          this._calculateMatch(pageIdx);
+
+        let promises;
+        if (i >= numPages) {
+          promises = [this._extractTextPromises[i],
+            this._extractTextPromises[i]];
+        } else {
+          promises = [this._extractTextPromises[i],
+            this._extractTextPromises[i + 1]];
+        }
+        Promise.all(promises).then((results) => {
+            let curIndex = results[0];
+            let nextIndex = results[1];
+            delete this._pendingFindMatches[curIndex];
+            this._calculateMatch(curIndex, nextIndex);
         });
       }
     }
