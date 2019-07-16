@@ -394,8 +394,16 @@ class PDFFindController {
   }
 
   _calculateMatch(curIndex, nextIndex) {
-    let pageContent = this._pageContents[curIndex] +
-        this._pageContents[nextIndex];
+    // TODO This is too expansive!
+    // What you actually want to do is:
+    // If you're doing a phrase search and part of the phrase has started on the
+    // current page, but hasn't yet completed (find an algorithm for backwards
+    // overlapping text!) search for the remaining bit on the next page,
+    // and return the match as both (how?)
+    // we still need to depend on both this page and the next page's contents.
+    // actually, what if the text spans 3 pages? make this iterative!
+    // which page takes the match? the page where the match begins.
+    let pageContent = this._pageContents[curIndex];
     let query = this._query;
     const { caseSensitive, entireWord, phraseSearch, } = this._state;
 
@@ -459,7 +467,7 @@ class PDFFindController {
           }
 
           // Store the normalized page content (text items) as one string.
-          this._pageContents[i] = normalize(strBuf.join(''));
+          this._pageContents[i] = normalize(strBuf.join(' '));
           extractTextCapability.resolve(i);
         }, (reason) => {
           console.error(`Unable to get text content for page ${i + 1}`, reason);
