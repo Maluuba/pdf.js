@@ -453,11 +453,14 @@ class PDFFindController {
           const strBuf = [];
 
           for (let j = 0, jj = textItems.length; j < jj; j++) {
-            strBuf.push(textItems[j].str);
+            const text = textItems[j].str.trim();
+            if (text.length > 0) {
+              strBuf.push(text);
+            }
           }
 
           // Store the normalized page content (text items) as one string.
-          this._pageContents[i] = normalize(strBuf.join(''));
+          this._pageContents[i] = normalize(strBuf.join(' '));
           extractTextCapability.resolve(i);
         }, (reason) => {
           console.error(`Unable to get text content for page ${i + 1}`, reason);
