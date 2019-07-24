@@ -67,8 +67,15 @@ class PDFFindController {
   /**
    * @param {PDFFindControllerOptions} options
    */
-  constructor({ linkService, eventBus = getGlobalEventBus(), }) {
-    this._linkService = linkService;
+  constructor({ linkService, pageCount, eventBus = getGlobalEventBus(), }) {
+    if (linkService) {
+      this._linkService = linkService;
+    } else {
+      this._page = 0;
+    }
+    if (pageCount) {
+      this._pageCount = pageCount; // allow for it to be undefined
+    }
     this._eventBus = eventBus;
 
     this._reset();
@@ -242,7 +249,9 @@ class PDFFindController {
     switch (cmd) {
       case 'findagain':
         const pageNumber = this._selected.pageIdx + 1;
-        const linkService = this._linkService;
+        const pageCount = this._linkService ?
+            this._linkService.pagesCount : this._pageCount;
+        const page = this._linkService ? this._linkService.page : this._page;
         // Only treat a 'findagain' event as a new search operation when it's
         // *absolutely* certain that the currently selected match is no longer
         // visible, e.g. as a result of the user scrolling in the document.
@@ -251,8 +260,8 @@ class PDFFindController {
         // there's a risk that consecutive 'findagain' operations could "skip"
         // over matches at the top/bottom of pages thus making them completely
         // inaccessible when there's multiple pages visible in the viewer.
-        if (pageNumber >= 1 && pageNumber <= linkService.pagesCount &&
-            pageNumber !== linkService.page &&
+        if (pageNumber >= 1 && pageNumber <= pageCount &&
+            pageNumber !== page &&
             !linkService.isPageVisible(pageNumber)) {
           return true;
         }
@@ -439,7 +448,9 @@ class PDFFindController {
     }
 
     let promise = Promise.resolve();
-    for (let i = 0, ii = this._linkService.pagesCount; i < ii; i++) {
+    const pageCount = this._linkService ?
+        this._linkService.pagesCount : this._pageCount;
+    for (let i = 0, ii = pageCount; i < ii; i++) {
       const extractTextCapability = createPromiseCapability();
       this._extractTextPromises[i] = extractTextCapability.promise;
 
@@ -477,7 +488,11 @@ class PDFFindController {
       // If the page is selected, scroll the page into view, which triggers
       // rendering the page, which adds the text layer. Once the text layer
       // is built, it will attempt to scroll the selected match into view.
-      this._linkService.page = index + 1;
+      if (this._linkService) {
+        this._linkService.page = index + 1;
+      } else {
+        this._page = index + 1;
+      }
     }
 
     this._eventBus.dispatch('updatetextlayermatches', {
@@ -495,8 +510,14 @@ class PDFFindController {
 
   _nextMatch() {
     const previous = this._state.findPrevious;
-    const currentPageIndex = this._linkService.page - 1;
-    const numPages = this._linkService.pagesCount;
+    let currentPageIndex;
+    if (this._linkService) {
+      currentPageIndex = this._linkService.page - 1;
+    } else {
+      currentPageIndex = this._page - 1;
+    }
+    const numPages = this._linkService ?
+        this._linkService.pagesCount : this._pageCount;
 
     this._highlightMatches = true;
 
@@ -608,7 +629,8 @@ class PDFFindController {
 
   _advanceOffsetPage(previous) {
     const offset = this._offset;
-    const numPages = this._linkService.pagesCount;
+    const numPages = this._linkService ?
+        this._linkService.pagesCount : this._pageCount;
     offset.pageIdx = (previous ? offset.pageIdx - 1 : offset.pageIdx + 1);
     offset.matchIdx = null;
 
